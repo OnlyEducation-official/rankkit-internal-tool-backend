@@ -7,18 +7,31 @@ import { errorHandler } from "./common/middleware/errorHandler";
 
 const app: Application = express();
 
-// Middlewares
+const allowedOrigins = [
+  "https://quotation.rankkitstudio.com",
+];
+
 app.use(
   cors({
-    origin: true,
+    origin(origin, callback) {
+      // allow non-browser tools / server-to-server / curl / health checks
+      if (!origin) return callback(null, true);
+
+      if (allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+
+      return callback(new Error("CORS policy does not allow this origin"));
+    },
     credentials: true,
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
   })
 );
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Health check
 app.get("/", (_req: Request, res: Response) => {
   res.status(200).json({
     success: true,
@@ -26,13 +39,9 @@ app.get("/", (_req: Request, res: Response) => {
   });
 });
 
-// API routes
 app.use("/api/v1", apiRoutes);
 
-// Not found middleware
 app.use(notFound);
-
-// Global error handler
 app.use(errorHandler);
 
 export default app;

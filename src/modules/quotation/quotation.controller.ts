@@ -82,8 +82,6 @@ const deleteQuotationController = async (
 const getAllQuotationsController = async (req: Request, res: Response) => {
   const query = (res.locals.validatedQuery ?? {}) as TGetAllQuotationsQuery;
 
-  console.log("Controller query:", query);
-
   const result = await quotationService.getAllQuotationsService(query);
 
   res.status(200).json({
