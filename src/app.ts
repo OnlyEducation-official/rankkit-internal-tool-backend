@@ -7,6 +7,13 @@ import { errorHandler } from "./common/middleware/errorHandler";
 
 const app: Application = express();
 
+// app.use(
+//   cors({
+//     origin: true,
+//     credentials: true,
+//   })
+// );
+
 const allowedOrigins = [
   "https://quotation.rankkitstudio.com",
 ];

@@ -14,16 +14,16 @@ const createQuotation = async (payload: TCreateQuotationBody) => {
     companyType: payload.companyType,
 
     clientName: payload.clientName,
-    clientAddress: payload.clientAddress || null,
-    clientPhone: payload.clientPhone || null,
-    clientEmail: payload.clientEmail || null,
+    clientAddress: payload.clientAddress || '',
+    clientPhone: payload.clientPhone || '',
+    clientEmail: payload.clientEmail || '',
 
     quotationDate: new Date(payload.quotationDate),
     validTill: new Date(payload.validTill),
 
     discount: payload.discount,
     grandTotal: payload.grandTotal,
-    notes: payload.notes || null,
+    notes: payload.notes || '',
     customTerms: payload.customTerms,
     salesPersonName: payload.salesPersonName,
 
