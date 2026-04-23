@@ -8,7 +8,7 @@ const router = Router();
 router.post(
   "/createQuotations",
   validateRequest(quotationValidation.createQuotation),
-  quotationController.createQuotation
+  quotationController.createQuotation 
 );
 
 router.get(
