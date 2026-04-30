@@ -49,6 +49,8 @@ const getQuotationByIdService = async (id: string) => {
 
   const quotation = await quotationRepository.quotationByIdRepository(id);
 
+  console.log(quotation)
+
   if (!quotation) {
     throw new Error("Quotation not found");
   }

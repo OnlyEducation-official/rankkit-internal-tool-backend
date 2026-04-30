@@ -16,6 +16,7 @@ const app: Application = express();
 
 const allowedOrigins = [
   "https://quotation.rankkitstudio.com",
+  "http://localhost:3000"
 ];
 
 app.use(

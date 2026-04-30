@@ -37,6 +37,7 @@ const getQuotationsRepository = async () => {
 }
 
 const quotationByIdRepository = async (id: string) => {
+  console.log(id)
   return await prisma.quotation.findUnique({
     where: {
       id,

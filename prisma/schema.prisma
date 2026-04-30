@@ -5,3 +5,94 @@ generator client {
 datasource db {
   provider = "postgresql"
 }
+
+model Quotation {
+  id              String           @id @default(uuid())
+  quotationNumber String           @unique
+
+  companyType     String?
+
+  companyName     String
+  companyAddress  String
+  companyPhone    String
+  companyEmail    String
+
+  clientName      String
+  clientAddress   String?
+  clientPhone     String?
+  clientEmail     String?
+
+  quotationDate   DateTime
+  validTill       DateTime
+
+  discount        Float            @default(0)
+  grandTotal      Float
+
+  notes           String?
+  customTerms     String[]
+  salesPersonName String
+
+  items           QuotationItem[]
+
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+}
+
+model QuotationItem {
+  id           String     @id @default(uuid())
+  quotationId  String
+
+  title        String
+  description  String?
+  rate         Float
+
+  quotation    Quotation  @relation(fields: [quotationId], references: [id], onDelete: Cascade)
+
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+}
+
+enum Role {
+  SUPER_ADMIN
+  EMPLOYEE
+}
+
+enum ModuleName {
+  QUOTATION
+  STUDIO_BOOKING
+  EMPLOYEE_MANAGEMENT
+}
+
+model User {
+  id        String   @id @default(uuid())
+  name      String
+  email     String   @unique
+  password  String
+  role      Role     @default(EMPLOYEE)
+  isAdmin    Boolean  @default(false)
+  isActive  Boolean  @default(true)
+
+  permissions UserModulePermission[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model UserModulePermission {
+  id           String     @id @default(uuid())
+  userId       String
+  module       ModuleName
+
+  canCreate    Boolean @default(false)
+  canRead      Boolean @default(false)
+  canUpdate    Boolean @default(false)
+  canDelete    Boolean @default(false)
+  canDuplicate Boolean @default(false)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, module])
+}

@@ -2,9 +2,9 @@ import { Router } from "express";
 
 // Import module routes
 import quotationRoutes from "../modules/quotation/quotation.routes";
+import authRoutes from "../modules/auth/auth.routes";
+import userRoutes from "../modules/user/user.routes";
 // Future modules (keep commented for now)
-// import authRoutes from "../modules/auth/auth.routes";
-// import userRoutes from "../modules/user/user.routes";
 // import bookingRoutes from "../modules/booking/booking.routes";
 // import taskRoutes from "../modules/task/task.routes";
 
@@ -23,6 +23,8 @@ router.get("/", (_req, res) => {
 /**
  * Module Routes
  */
+router.use("/auth", authRoutes);
+router.use("/users", userRoutes);
 router.use("/quotations", quotationRoutes);
 
 // Future expansion (just uncomment when ready)
