@@ -17,7 +17,7 @@ const actionLabels: Record<PermissionAction, string> = {
   canDuplicate: "duplicate",
 };
 
-const moduleLabels: Record<string, string> = {
+const moduleLabels: Record<ModuleName, string> = {
   QUOTATION: "quotations",
   STUDIO_BOOKING: "studio bookings",
   EMPLOYEE_MANAGEMENT: "employee data",
@@ -36,8 +36,36 @@ export const checkPermission = (
         });
       }
 
-      if (req.user.role === "SUPER_ADMIN") {
-        return next();
+      const user = await prisma.user.findUnique({
+        where: {
+          id: req.user.id,
+        },
+        select: {
+          id: true,
+          isAdmin: true,
+          isActive: true,
+        },
+      });
+
+      if (!user) {
+        return res.status(401).json({
+          success: false,
+          message: "User not found",
+        });
+      }
+
+      if (!user.isActive) {
+        return res.status(403).json({
+          success: false,
+          message: "Your account is inactive. Please contact admin.",
+        });
+      }
+
+      if (module === ModuleName.EMPLOYEE_MANAGEMENT && !user.isAdmin) {
+        return res.status(403).json({
+          success: false,
+          message: "Admin access required",
+        });
       }
 
       const permission = await prisma.userModulePermission.findUnique({
@@ -63,7 +91,7 @@ export const checkPermission = (
     } catch (error: any) {
       return res.status(500).json({
         success: false,
-        message: error.message,
+        message: error.message || "Something went wrong",
       });
     }
   };

@@ -1,8 +1,8 @@
-// src/middleware/role.middleware.ts
+// src/middleware/admin.middleware.ts
 
 import { NextFunction, Request, Response } from "express";
 
-export const requireSuperAdmin = (
+export const requireAdmin = (
   req: Request,
   res: Response,
   next: NextFunction
@@ -14,10 +14,10 @@ export const requireSuperAdmin = (
     });
   }
 
-  if (req.user.role !== "SUPER_ADMIN") {
+  if (!req.user.isAdmin) {
     return res.status(403).json({
       success: false,
-      message: "Only super admin can access this route",
+      message: "Admin access required",
     });
   }
 

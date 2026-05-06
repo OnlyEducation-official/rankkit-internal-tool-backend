@@ -49,6 +49,7 @@ export const getCurrentUser = async (userId: string) => {
       email: true,
       role: true,
       isActive: true,
+      isAdmin: true,
       permissions: {
         select: {
           id: true,

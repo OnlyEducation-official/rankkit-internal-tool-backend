@@ -10,17 +10,53 @@ import {
   updateUserController,
 } from "./user.controller";
 import { authMiddleware } from "../../common/middleware/auth.middleware";
-import { requireSuperAdmin } from "../../common/middleware/role.middleware";
+import { checkPermission } from "../../common/middleware/permission.middleware";
+import { ModuleName } from "@prisma/client";
+import { validateRequest } from "../../common/middleware/validateRequest";
+import { createUserSchema, updateUserSchema } from "./user.validation";
 
 const router = express.Router();
 
 router.use(authMiddleware);
-router.use(requireSuperAdmin);
+// router.use(requireSuperAdmin);
 
-router.post("/", createUserController);
-router.get("/", getAllUsersController);
-router.get("/:id", getUserByIdController);
-router.patch("/:id", updateUserController);
-router.delete("/:id", deleteUserController);
+// router.post(
+//   "/",
+//   checkPermission(ModuleName.EMPLOYEE_MANAGEMENT, "canCreate"), 
+//   validateRequest(createUserSchema),
+//   createUserController
+// );
+
+router.post(
+  "/",
+  checkPermission(ModuleName.EMPLOYEE_MANAGEMENT, "canCreate"),
+  validateRequest(createUserSchema),
+  createUserController
+);
+
+router.get(
+  "/",
+  checkPermission(ModuleName.EMPLOYEE_MANAGEMENT, "canRead"),
+  getAllUsersController
+);
+
+router.get(
+  "/:id", 
+  checkPermission(ModuleName.EMPLOYEE_MANAGEMENT, "canRead"),
+  getUserByIdController
+);
+
+router.patch(
+  "/:id", 
+  checkPermission(ModuleName.EMPLOYEE_MANAGEMENT, "canUpdate"),  
+  validateRequest(updateUserSchema),
+  updateUserController
+);
+
+router.delete(
+  "/:id", 
+  checkPermission(ModuleName.EMPLOYEE_MANAGEMENT, "canDelete"),
+  deleteUserController
+);
 
 export default router;

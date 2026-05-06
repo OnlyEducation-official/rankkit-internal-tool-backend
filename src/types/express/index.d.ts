@@ -1,4 +1,4 @@
-import type { Role } from "@prisma/client";
+// src/types/express.d.ts
 
 declare global {
   namespace Express {
@@ -6,7 +6,7 @@ declare global {
       user?: {
         id: string;
         email: string;
-        role: Role;
+        isAdmin: boolean;
       };
     }
   }

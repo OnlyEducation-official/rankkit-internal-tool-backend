@@ -1,7 +1,5 @@
-// prisma/seed.ts
-
 import "dotenv/config";
-import { PrismaClient, Role } from "@prisma/client";
+import { PrismaClient, ModuleName } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import bcrypt from "bcryptjs";
 
@@ -9,26 +7,56 @@ const adapter = new PrismaPg({
   connectionString: process.env.DATABASE_URL!,
 });
 
-const prisma = new PrismaClient({ adapter });
+const prisma = new PrismaClient({
+  adapter,
+});
 
 async function main() {
-  const hashedPassword = await bcrypt.hash("admin123", 10);
+  const hashedPassword = await bcrypt.hash("Admin@123", 10);
 
-  await prisma.user.upsert({
+  const admin = await prisma.user.upsert({
     where: {
       email: "admin@rankkit.com",
     },
     update: {},
     create: {
-      name: "Super Admin",
+      name: "Root Admin",
       email: "admin@rankkit.com",
       password: hashedPassword,
-      role: Role.SUPER_ADMIN,
+      isAdmin: true,
       isActive: true,
+      permissions: {
+        create: [
+          {
+            module: ModuleName.QUOTATION,
+            canCreate: true,
+            canRead: true,
+            canUpdate: true,
+            canDelete: true,
+            canDuplicate: true,
+          },
+          {
+            module: ModuleName.STUDIO_BOOKING,
+            canCreate: true,
+            canRead: true,
+            canUpdate: true,
+            canDelete: true,
+            canDuplicate: true,
+          },
+          {
+            module: ModuleName.EMPLOYEE_MANAGEMENT,
+            canCreate: true,
+            canRead: true,
+            canUpdate: true,
+            canDelete: true,
+            canDuplicate: true,
+          },
+        ],
+      },
     },
   });
 
-  console.log("Super admin created successfully");
+  console.log("Root admin created:", admin.email);
 }
 
 main()

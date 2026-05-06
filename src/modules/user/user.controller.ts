@@ -1,6 +1,6 @@
 // src/modules/users/user.controller.ts
 
-import { Request, Response } from "express";
+import { NextFunction, Request, Response } from "express";
 import {
   createUser,
   deleteUser,
@@ -8,30 +8,26 @@ import {
   getUserById,
   updateUser,
 } from "./user.service";
-import { createUserSchema, updateUserSchema } from "./user.validation";
+import { TGetAllQuotationsQuery } from "../quotation/quotation.validation";
 
-export const createUserController = async (req: Request, res: Response) => {
+export const createUserController = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const validatedData = createUserSchema.parse(req.body);
-
-    const user = await createUser(validatedData);
+    const user = await createUser(req.body);
 
     return res.status(201).json({
       success: true,
       message: "User created successfully",
       data: user,
     });
-  } catch (error: any) {
-    return res.status(400).json({
-      success: false,
-      message: error.message,
-    });
+  } catch (error) {
+    next(error);
   }
 };
 
 export const getAllUsersController = async (_req: Request, res: Response) => {
   try {
-    const users = await getAllUsers();
+    const query = (res.locals.validatedQuery ?? {}) as TGetAllQuotationsQuery;
+    const users = await getAllUsers(query);
 
     return res.status(200).json({
       success: true,
@@ -65,9 +61,8 @@ export const getUserByIdController = async (req: Request, res: Response) => {
 
 export const updateUserController = async (req: Request, res: Response) => {
   try {
-    const validatedData = updateUserSchema.parse(req.body);
 
-    const user = await updateUser(req.params.id as string, validatedData);
+    const user = await updateUser(req.params.id as string, req.body);
 
     return res.status(200).json({
       success: true,

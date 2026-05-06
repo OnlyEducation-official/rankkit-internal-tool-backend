@@ -6,7 +6,7 @@ declare global {
       user?: {
         id: string;
         email: string;
-        role: "SUPER_ADMIN" | "EMPLOYEE";
+        isAdmin: boolean;
       };
     }
   }

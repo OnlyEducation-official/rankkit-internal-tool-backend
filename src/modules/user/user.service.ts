@@ -1,17 +1,53 @@
 // src/modules/users/user.service.ts
 
 import bcrypt from "bcryptjs";
-import prisma from "../../config/prisma";
-import { createUserSchema, updateUserSchema } from "./user.validation";
-import { z } from "zod";
+import { ModuleName } from "@prisma/client";
+import { userRepository } from "./user.repository";
+import { TGetAllQuotationsQuery } from "../quotation/quotation.validation";
 
-type CreateUserInput = z.infer<typeof createUserSchema>;
-type UpdateUserInput = z.infer<typeof updateUserSchema>;
+type PermissionInput = {
+  module: ModuleName;
+  canCreate?: boolean;
+  canRead?: boolean;
+  canUpdate?: boolean;
+  canDelete?: boolean;
+  canDuplicate?: boolean;
+};
+
+type CreateUserInput = {
+  name: string;
+  email: string;
+  password: string;
+  isAdmin?: boolean;
+  permissions?: PermissionInput[];
+};
+
+type UpdateUserInput = {
+  name?: string;
+  email?: string;
+  password?: string;
+  isAdmin?: boolean;
+  isActive?: boolean;
+  permissions?: PermissionInput[];
+};
+
+const normalizePermissions = (
+  userId: string,
+  permissions: PermissionInput[] = []
+) => {
+  return permissions.map((permission) => ({
+    userId,
+    module: permission.module,
+    canCreate: permission.canCreate ?? false,
+    canRead: permission.canRead ?? false,
+    canUpdate: permission.canUpdate ?? false,
+    canDelete: permission.canDelete ?? false,
+    canDuplicate: permission.canDuplicate ?? false,
+  }));
+};
 
 export const createUser = async (payload: CreateUserInput) => {
-  const existingUser = await prisma.user.findUnique({
-    where: { email: payload.email },
-  });
+  const existingUser = await userRepository.findByEmail(payload.email);
 
   if (existingUser) {
     throw new Error("User already exists with this email");
@@ -19,44 +55,34 @@ export const createUser = async (payload: CreateUserInput) => {
 
   const hashedPassword = await bcrypt.hash(payload.password, 10);
 
-  const user = await prisma.user.create({
-    data: {
-      name: payload.name,
-      email: payload.email,
-      password: hashedPassword,
-      role: payload.role,
-      permissions: {
-        create:
-          payload.role === "EMPLOYEE"
-            ? payload.permissions?.map((permission) => ({
-              module: permission.module,
-              canCreate: permission.canCreate ?? false,
-              canRead: permission.canRead ?? false,
-              canUpdate: permission.canUpdate ?? false,
-              canDelete: permission.canDelete ?? false,
-              canDuplicate: permission.canDuplicate ?? false,
-            }))
-            : [],
-      },
+  const user = await userRepository.create({
+    name: payload.name,
+    email: payload.email,
+    password: hashedPassword,
+    isAdmin: payload.isAdmin ?? false,
+    role: "EMPLOYEE",
+    permissions: {
+      create:
+        payload.permissions?.map((permission) => ({
+          module: permission.module,
+          canCreate: permission.canCreate ?? false,
+          canRead: permission.canRead ?? false,
+          canUpdate: permission.canUpdate ?? false,
+          canDelete: permission.canDelete ?? false,
+          canDuplicate: permission.canDuplicate ?? false,
+        })) ?? [],
     },
-    select: userSelect,
   });
 
   return user;
 };
 
-export const getAllUsers = async () => {
-  return prisma.user.findMany({
-    orderBy: { createdAt: "desc" },
-    select: userSelect,
-  });
+export const getAllUsers = async (query: TGetAllQuotationsQuery) => {
+  return userRepository.findAll(query);
 };
 
 export const getUserById = async (id: string) => {
-  const user = await prisma.user.findUnique({
-    where: { id },
-    select: userSelect,
-  });
+  const user = await userRepository.findById(id);
 
   if (!user) {
     throw new Error("User not found");
@@ -66,12 +92,18 @@ export const getUserById = async (id: string) => {
 };
 
 export const updateUser = async (id: string, payload: UpdateUserInput) => {
-  const existingUser = await prisma.user.findUnique({
-    where: { id },
-  });
+  const existingUser = await userRepository.findRawById(id);
 
   if (!existingUser) {
     throw new Error("User not found");
+  }
+
+  if (payload.email && payload.email !== existingUser.email) {
+    const emailExists = await userRepository.findByEmail(payload.email);
+
+    if (emailExists) {
+      throw new Error("User already exists with this email");
+    }
   }
 
   let hashedPassword: string | undefined;
@@ -80,80 +112,39 @@ export const updateUser = async (id: string, payload: UpdateUserInput) => {
     hashedPassword = await bcrypt.hash(payload.password, 10);
   }
 
-  const user = await prisma.$transaction(async (tx) => {
-    await tx.user.update({
-      where: { id },
-      data: {
-        name: payload.name,
-        email: payload.email,
-        role: payload.role,
-        isActive: payload.isActive,
-        password: hashedPassword,
-      },
+  const user = await userRepository.transaction(async (tx) => {
+    await userRepository.updateBasicUser(tx, id, {
+      name: payload.name,
+      email: payload.email,
+      isAdmin: payload.isAdmin,
+      isActive: payload.isActive,
+      password: hashedPassword,
     });
 
     if (payload.permissions) {
-      await tx.userModulePermission.deleteMany({
-        where: { userId: id },
-      });
+      await userRepository.deletePermissionsByUserId(tx, id);
 
-      if (payload.role !== "SUPER_ADMIN") {
-        await tx.userModulePermission.createMany({
-          data: payload.permissions.map((permission) => ({
-            userId: id,
-            module: permission.module,
-            canCreate: permission.canCreate ?? false,
-            canRead: permission.canRead ?? false,
-            canUpdate: permission.canUpdate ?? false,
-            canDelete: permission.canDelete ?? false,
-            canDuplicate: permission.canDuplicate ?? false,
-          })),
-        });
+      const permissionData = normalizePermissions(id, payload.permissions);
+
+      if (permissionData.length > 0) {
+        await userRepository.createPermissions(tx, permissionData);
       }
     }
 
-    return tx.user.findUnique({
-      where: { id },
-      select: userSelect,
-    });
+    return userRepository.findByIdWithTransaction(tx, id);
   });
 
   return user;
 };
 
 export const deleteUser = async (id: string) => {
-  const user = await prisma.user.findUnique({
-    where: { id },
-  });
+  const user = await userRepository.findRawById(id);
 
   if (!user) {
     throw new Error("User not found");
   }
 
-  await prisma.user.delete({
-    where: { id },
-  });
+  await userRepository.deleteById(id);
 
   return null;
-};
-
-const userSelect = {
-  id: true,
-  name: true,
-  email: true,
-  role: true,
-  isActive: true,
-  createdAt: true,
-  updatedAt: true,
-  permissions: {
-    select: {
-      id: true,
-      module: true,
-      canCreate: true,
-      canRead: true,
-      canUpdate: true,
-      canDelete: true,
-      canDuplicate: true,
-    },
-  },
 };

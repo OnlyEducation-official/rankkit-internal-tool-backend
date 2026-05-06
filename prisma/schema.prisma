@@ -53,7 +53,6 @@ model QuotationItem {
 }
 
 enum Role {
-  SUPER_ADMIN
   EMPLOYEE
 }
 
@@ -68,14 +67,21 @@ model User {
   name      String
   email     String   @unique
   password  String
+
   role      Role     @default(EMPLOYEE)
-  isAdmin    Boolean  @default(false)
+
+  // This decides whether employee has admin-level access
+  isAdmin   Boolean  @default(false)
+
   isActive  Boolean  @default(true)
 
   permissions UserModulePermission[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([isAdmin])
+  @@index([isActive])
 }
 
 model UserModulePermission {
@@ -95,4 +101,6 @@ model UserModulePermission {
   updatedAt DateTime @updatedAt
 
   @@unique([userId, module])
+  @@index([userId])
+  @@index([module])
 }
