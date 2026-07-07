@@ -1,4 +1,4 @@
-import { string, z } from "zod";
+import { z } from "zod";
 
 const quotationItemSchema = z.object({
   title: z
@@ -10,7 +10,10 @@ const quotationItemSchema = z.object({
   description: z
     .string()
     .trim()
-    .max(10000, "Item description cannot exceed 10000 characters")
+    // Quotation item descriptions can be long. Keep a generous upper bound
+    // (aligned with the 10mb body limit) so real content is never truncated,
+    // while still guarding against unbounded/abusive input.
+    .max(100000, "Item description cannot exceed 100000 characters")
     .optional()
     .or(z.literal("")),
 

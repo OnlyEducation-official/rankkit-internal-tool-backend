@@ -16,6 +16,7 @@ const app: Application = express();
 
 const allowedOrigins = [
   "https://quotation.rankkitstudio.com",
+  "http://localhost:3000"
 ];
 
 app.use(
@@ -36,8 +37,10 @@ app.use(
   })
 );
 
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+// Quotations can carry large descriptions/notes, so raise the default 100kb
+// body limit. The limit still protects against unbounded payloads.
+app.use(express.json({ limit: "10mb" }));
+app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
 app.get("/", (_req: Request, res: Response) => {
   res.status(200).json({
