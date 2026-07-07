@@ -1,5 +1,5 @@
 import { NextFunction, Request, Response } from "express";
-import { ZodError, ZodType } from "zod";
+import { ZodType } from "zod";
 
 type RequestSchema = ZodType<{
   body?: any;
@@ -23,28 +23,8 @@ export const validateRequest =
 
       next();
     } catch (error) {
-      if (error instanceof ZodError) {
-        // Surface the first issue's message at the top level so a frontend
-        // that renders `message` shows the specific reason (e.g. a field limit)
-        // instead of a generic "Validation failed".
-        const firstIssue = error.issues[0];
-        const fieldPath = firstIssue?.path
-          .filter((segment) => segment !== "body")
-          .join(".");
-        const message = firstIssue
-          ? `${fieldPath ? `${fieldPath}: ` : ""}${firstIssue.message}`
-          : "Validation failed";
-
-        return res.status(400).json({
-          success: false,
-          message,
-          error: {
-            code: "VALIDATION_ERROR",
-          },
-          errors: error.issues,
-        });
-      }
-
+      // Delegate to the global error handler so validation errors get the
+      // same consistent shape (422 + field-level details) as everything else.
       next(error);
     }
   };

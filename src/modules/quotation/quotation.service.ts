@@ -1,3 +1,4 @@
+import { AppError } from "../../common/errors/AppError";
 import { generateQuotationNumber } from "../../common/utils/generateQuotationNumber";
 import { quotationRepository } from "./quotation.repository";
 import type { TCreateQuotationBody, TGetAllQuotationsQuery, TUpdateQuotationBody } from "./quotation.validation";
@@ -50,7 +51,7 @@ const getQuotationByIdService = async (id: string) => {
   const quotation = await quotationRepository.quotationByIdRepository(id);
 
   if (!quotation) {
-    throw new Error("Quotation not found");
+    throw AppError.notFound("Quotation not found");
   }
 
   return quotation;

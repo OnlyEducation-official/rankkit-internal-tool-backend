@@ -3,7 +3,6 @@ import type { Request, Response } from "express";
 import { quotationService } from "./quotation.service";
 import { catchAsync } from "../../common/utils/catchAsync";
 import { sendResponse } from "../../common/utils/sendResponse";
-import { success } from "zod";
 import { TGetAllQuotationsQuery } from "./quotation.validation";
 
 type Params = {
@@ -13,7 +12,7 @@ type Params = {
 const createQuotation = catchAsync(async (req: Request, res: Response) => {
   await quotationService.createQuotation(req.body);
 
-  sendResponse(res ? {
+  sendResponse({
     res,
     statusCode: 201,
     success: true,
@@ -21,7 +20,7 @@ const createQuotation = catchAsync(async (req: Request, res: Response) => {
     meta: {
       action: "CREATE_QUOTATION",
     },
-  } : undefined as never);
+  });
 });
 
 // const getAllQuotationsController = async (_req: Request, res: Response) => {
@@ -35,62 +34,62 @@ const createQuotation = catchAsync(async (req: Request, res: Response) => {
 
 // }
 
-const getQuotationByIdController = async (req: Request<Params>, res: Response) => {
+const getQuotationByIdController = catchAsync(
+  async (req: Request<Params>, res: Response) => {
+    const { id } = req.params;
 
-  const { id } = req.params;
+    const result = await quotationService.getQuotationByIdService(id);
 
-  const result = await quotationService.getQuotationByIdService(id);
+    res.status(200).json({
+      success: true,
+      message: "Quotation fetched successfully",
+      data: result,
+    });
+  }
+);
 
-  res.status(200).json({
-    success: true,
-    message: "Quotation fetched successfully",
-    data: result,
-  });
+const updateQuotationController = catchAsync(
+  async (req: Request<Params>, res: Response) => {
+    const { id } = req.params;
 
-}
+    const result = await quotationService.updateQuotationService(id, req.body);
 
-const updateQuotationController = async (
-  req: Request<Params>,
-  res: Response
-) => {
-  const { id } = req.params;
+    res.status(200).json({
+      success: true,
+      message: "Quotation updated successfully",
+      data: result,
+    });
+  }
+);
 
-  const result = await quotationService.updateQuotationService(id, req.body);
+const deleteQuotationController = catchAsync(
+  async (req: Request<Params>, res: Response) => {
+    const { id } = req.params;
 
-  res.status(200).json({
-    success: true,
-    message: "Quotation updated successfully",
-    data: result,
-  });
-};
+    await quotationService.deleteQuotationService(id);
 
-const deleteQuotationController = async (
-  req: Request<Params>,
-  res: Response
-) => {
-  const { id } = req.params;
+    res.status(200).json({
+      success: true,
+      message: "Quotation deleted successfully",
+      data: null,
+    });
+  }
+);
 
-  await quotationService.deleteQuotationService(id);
+const getAllQuotationsController = catchAsync(
+  async (_req: Request, res: Response) => {
+    const query = (res.locals.validatedQuery ?? {}) as TGetAllQuotationsQuery;
 
-  res.status(200).json({
-    success: true,
-    message: "Quotation deleted successfully",
-    data: null,
-  });
-};
+    const result = await quotationService.getAllQuotationsService(query);
 
-const getAllQuotationsController = async (req: Request, res: Response) => {
-  const query = (res.locals.validatedQuery ?? {}) as TGetAllQuotationsQuery;
-
-  const result = await quotationService.getAllQuotationsService(query);
-
-  res.status(200).json({
-    success: true,
-    message: "Quotations fetched successfully",
-    meta: result.meta,
-    data: result.data,
-  });
-};
+    res.status(200).json({
+      success: true,
+      message: "Quotations fetched successfully",
+      meta: result.meta,
+      data: result.data,
+    });
+  }
+);
 
 export const quotationController = {
   createQuotation,

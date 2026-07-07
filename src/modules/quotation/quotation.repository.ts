@@ -87,7 +87,7 @@ const deleteQuotationRepository = async (id: string) => {
   });
 
   if (!existingQuotation) {
-    throw new Error("Quotation not found");
+    throw AppError.notFound("Quotation not found");
   }
 
   return prisma.quotation.delete({

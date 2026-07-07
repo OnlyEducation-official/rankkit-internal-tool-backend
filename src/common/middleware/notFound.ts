@@ -1,8 +1,10 @@
 import { Request, Response, NextFunction } from "express";
+import { AppError } from "../errors/AppError";
 
-export const notFound = (_req: Request, res: Response, _next: NextFunction) => {
-  res.status(404).json({
-    success: false,
-    message: "Route not found",
-  });
+/**
+ * Fallback handler for any route that didn't match. Delegates to the global
+ * error handler so 404s use the same consistent error response shape.
+ */
+export const notFound = (req: Request, _res: Response, next: NextFunction) => {
+  next(AppError.notFound(`Route not found: ${req.method} ${req.originalUrl}`));
 };
