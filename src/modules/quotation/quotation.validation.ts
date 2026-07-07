@@ -10,7 +10,7 @@ const quotationItemSchema = z.object({
   description: z
     .string()
     .trim()
-    .max(3000, "Item description cannot exceed 3000 characters")
+    .max(10000, "Item description cannot exceed 10000 characters")
     .optional()
     .or(z.literal("")),
 
