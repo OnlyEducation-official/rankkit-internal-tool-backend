@@ -67,6 +67,11 @@ model User {
   name      String
   email     String   @unique
   password  String
+  salary         Float?
+  designation    String?
+  aadharCard     String?
+  panCard        String?
+  profilePicture String?
 
   role      Role     @default(EMPLOYEE)
 

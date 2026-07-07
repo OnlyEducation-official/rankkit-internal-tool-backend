@@ -11,6 +11,11 @@ export const userSelect = {
   role: true,
   isAdmin: true,
   isActive: true,
+  salary: true,
+  designation: true,
+  aadharCard: true,
+  panCard: true,
+  profilePicture: true,
   createdAt: true,
   updatedAt: true,
   permissions: {

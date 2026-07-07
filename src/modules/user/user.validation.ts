@@ -31,6 +31,11 @@ export const createUserSchema = z.object({
     email: z.string(),
     password: z.string(),
     permissions: z.array(permissionSchema),
+    salary: z.coerce.number().min(0, "Salary cannot be negative.").optional(),
+    designation: z.string().optional(),
+    aadharCard: z.string().optional(),
+    panCard: z.string().optional(),
+    profilePicture: z.string().optional(),
   }),
 });
 
@@ -42,6 +47,12 @@ export const updateUserSchema = z.object({
       password: z.string().optional(),
       isActive: z.boolean().optional(),
       isAdmin: z.boolean().optional(),
+
+      salary: z.coerce.number().min(0, "Salary cannot be negative.").optional(),
+      designation: z.string().optional(),
+      aadharCard: z.string().optional(),
+      panCard: z.string().optional(),
+      profilePicture: z.string().optional(),
 
       permissions: z.array(permissionSchema).optional(),
     })
