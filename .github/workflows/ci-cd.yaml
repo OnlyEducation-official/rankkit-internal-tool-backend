@@ -2,37 +2,37 @@ name: Rankkit Internal Tool Backend CI/CD
 
 on:
   push:
-    branches: [main]
+    branches:
+      - main
   pull_request:
-    branches: [main]
+    branches:
+      - main
+
+permissions:
+  contents: read
 
 jobs:
   build:
-    name: Build Backend
+    name: Build and Test
     runs-on: ubuntu-latest
+
     env:
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v7
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: "20"
-          cache: "npm"
+          cache: npm
 
       - name: Install dependencies
-        run: npm ci --include=dev
+        run: npm ci
 
-      - name: Verify Prisma versions
-        run: npm ls prisma @prisma/client
-
-      - name: Generate Prisma Client
-        run: npx prisma generate
-
-      - name: Build app
+      - name: Build application
         run: npm run build
 
       - name: Run tests
@@ -41,41 +41,95 @@ jobs:
   deploy:
     name: Deploy to VPS
     needs: build
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main' 
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
 
     steps:
-      - name: Deploy over SSH
-        uses: appleboy/ssh-action@v1.0.3
+      - name: Deploy application
+        uses: appleboy/ssh-action@v1.2.5
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
           port: ${{ secrets.VPS_PORT }}
+          command_timeout: 20m
           script: |
-            set -e
+            set -Eeuo pipefail
 
-            cd /home/delicate/apps/rankkit-internal-tool-backend
-            git fetch origin
+            APP_DIR="/home/delicate/apps/rankkit-internal-tool-backend"
+            APP_NAME="rankkit-internal-tool-backend"
+            HEALTH_URL="https://api.rankkitstudio.com/"
+
+            cd "$APP_DIR"
+
+            echo "Pulling latest code..."
+            git fetch origin main
             git reset --hard origin/main
 
+            echo "Installing dependencies..."
             npm ci --include=dev
-            npm ls prisma @prisma/client
-            npx prisma generate
-            npx prisma migrate deploy
+
+            echo "Building application..."
             rm -rf dist
             npm run build
 
-            export APP_VERSION="${{ github.sha }}"
-            pm2 restart rankkit-internal-tool-backend --update-env || pm2 start dist/server.js --name rankkit-internal-tool-backend --cwd "$PWD"
-            sleep 5
-            pm2 show rankkit-internal-tool-backend
+            echo "Running database migrations..."
+            npx prisma migrate deploy
 
-            LIVE_VERSION="$(curl -fsS https://api.rankkitstudio.com/ | node -e 'let input = ""; process.stdin.on("data", chunk => input += chunk); process.stdin.on("end", () => process.stdout.write(JSON.parse(input).version || ""));')"
-            if [ "$LIVE_VERSION" != "$APP_VERSION" ]; then
-              echo "Public API is serving $LIVE_VERSION instead of $APP_VERSION"
-              pm2 logs rankkit-internal-tool-backend --err --lines 50 --nostream
+            echo "Restarting application..."
+
+            # Remove the old PM2 process so an outdated script path is not reused.
+            pm2 delete "$APP_NAME" 2>/dev/null || true
+
+            # Run the package.json start script through PM2.
+            NODE_ENV=production pm2 start npm \
+              --name "$APP_NAME" \
+              --cwd "$APP_DIR" \
+              -- start
+
+            sleep 5
+
+            PM2_STATUS="$(pm2 jlist | node -e '
+              let data = "";
+
+              process.stdin.on("data", chunk => {
+                data += chunk;
+              });
+
+              process.stdin.on("end", () => {
+                const processes = JSON.parse(data);
+
+                const app = processes.find(
+                  process =>
+                    process.name === "rankkit-internal-tool-backend"
+                );
+
+                process.stdout.write(
+                  app?.pm2_env?.status || "missing"
+                );
+              });
+            ')"
+
+            echo "PM2 status: $PM2_STATUS"
+
+            if [ "$PM2_STATUS" != "online" ]; then
+              echo "Application failed to start."
+              pm2 logs "$APP_NAME" --lines 100 --nostream || true
               exit 1
             fi
 
+            echo "Checking public API..."
+
+            curl \
+              --retry 5 \
+              --retry-delay 3 \
+              --retry-connrefused \
+              --connect-timeout 10 \
+              --max-time 20 \
+              -fsS \
+              "$HEALTH_URL" > /dev/null
+
             pm2 save
+            pm2 show "$APP_NAME"
+
+            echo "Deployment completed successfully."
