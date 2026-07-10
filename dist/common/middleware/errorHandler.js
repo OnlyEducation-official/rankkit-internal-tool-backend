@@ -1,10 +1,10 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.errorHandler = void 0;
-const client_1 = require("@prisma/client");
 const jsonwebtoken_1 = require("jsonwebtoken");
 const zod_1 = require("zod");
 const AppError_1 = require("../errors/AppError");
+const client_1 = require("@prisma/client");
 /** Turn a Zod issue path into a frontend form path, dropping request roots. */
 const toFieldName = (path) => path
     .filter((segment) => !["body", "params", "query"].includes(String(segment)))

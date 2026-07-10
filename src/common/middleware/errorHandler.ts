@@ -1,8 +1,8 @@
 import type { NextFunction, Request, Response } from "express";
-import { Prisma } from "@prisma/client";
 import { JsonWebTokenError, TokenExpiredError } from "jsonwebtoken";
 import { ZodError, ZodIssue } from "zod";
 import { AppError, TErrorDetail } from "../errors/AppError";
+import { Prisma } from "@prisma/client";
 
 type TNormalizedError = {
   statusCode: number;

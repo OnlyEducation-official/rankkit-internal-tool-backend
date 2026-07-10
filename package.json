@@ -4,7 +4,8 @@
   "main": "index.js",
   "scripts": {
     "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
-    "build": "tsc",
+    "prisma:generate": "prisma generate",
+    "build": "npm run prisma:generate && tsc",
     "start": "node dist/server.js",
     "test": "npm run build && node --test dist/modules/quotation/quotation.validation.test.js dist/modules/quotation/quotation.api.test.js"
   },
