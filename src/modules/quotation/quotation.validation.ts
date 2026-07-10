@@ -1,6 +1,8 @@
 import { z } from "zod";
 
-const quotationItemSchema = z.object({
+export const QUOTATION_ITEM_DESCRIPTION_MAX_LENGTH = 100_000;
+
+export const quotationItemSchema = z.object({
   title: z
     .string()
     .trim()
@@ -13,7 +15,10 @@ const quotationItemSchema = z.object({
     // Quotation item descriptions can be long. Keep a generous upper bound
     // (aligned with the 10mb body limit) so real content is never truncated,
     // while still guarding against unbounded/abusive input.
-    .max(100000, "Item description cannot exceed 100000 characters")
+    .max(
+      QUOTATION_ITEM_DESCRIPTION_MAX_LENGTH,
+      `Item description cannot exceed ${QUOTATION_ITEM_DESCRIPTION_MAX_LENGTH} characters`
+    )
     .optional()
     .or(z.literal("")),
 
@@ -99,7 +104,7 @@ const baseQuotationBodySchema = z.object({
     .min(1, "At least one item is required"),
 });
 
-const createQuotationBodySchema = baseQuotationBodySchema.superRefine((data, ctx) => {
+export const createQuotationBodySchema = baseQuotationBodySchema.superRefine((data, ctx) => {
   const quotationDate = new Date(data.quotationDate);
   const validTill = new Date(data.validTill);
 
@@ -130,7 +135,7 @@ const updateQuotationBodySchema = baseQuotationBodySchema
   });
 
 const quotationIdParamsSchema = z.object({
-  id: z.string(),
+  id: z.uuid("Invalid quotation ID"),
 });
 
 

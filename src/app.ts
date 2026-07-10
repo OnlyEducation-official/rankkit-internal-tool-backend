@@ -46,6 +46,7 @@ app.get("/", (_req: Request, res: Response) => {
   res.status(200).json({
     success: true,
     message: "Rankkit Internal Tool Backend is running",
+    version: process.env.APP_VERSION || "development",
   });
 });
 

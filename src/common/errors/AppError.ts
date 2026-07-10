@@ -7,6 +7,7 @@
 export type TErrorDetail = {
   field: string;
   message: string;
+  code?: string;
 };
 
 /**

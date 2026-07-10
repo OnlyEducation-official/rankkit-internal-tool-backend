@@ -1,27 +1,8 @@
-// src/common/middleware/errorHandler.ts
-//
-// Centralized/global error handler. Every error that flows through the app —
-// thrown in a controller/service/repository, produced by validation, Prisma,
-// JWT, or the body parser — is normalized here into ONE consistent JSON shape:
-//
-//   {
-//     "success": false,
-//     "message": "<human readable message for the user>",
-//     "error": {
-//       "code": "VALIDATION_ERROR",
-//       "statusCode": 422,
-//       "details": [{ "field": "description", "message": "..." }] // optional
-//       "stack": "..."                                            // dev only
-//     }
-//   }
-//
 import type { NextFunction, Request, Response } from "express";
 import { Prisma } from "@prisma/client";
-import { ZodError, ZodIssue } from "zod";
 import { JsonWebTokenError, TokenExpiredError } from "jsonwebtoken";
+import { ZodError, ZodIssue } from "zod";
 import { AppError, TErrorDetail } from "../errors/AppError";
-
-const isProduction = process.env.NODE_ENV === "production";
 
 type TNormalizedError = {
   statusCode: number;
@@ -30,44 +11,86 @@ type TNormalizedError = {
   details?: TErrorDetail[];
 };
 
-/** Turn a Zod issue path into a flat field name, dropping the "body" root. */
+/** Turn a Zod issue path into a frontend form path, dropping request roots. */
 const toFieldName = (path: ZodIssue["path"]): string =>
   path
-    .filter((segment) => segment !== "body")
-    .map((segment) => String(segment))
+    .filter((segment) => !["body", "params", "query"].includes(String(segment)))
+    .map(String)
     .join(".") || "root";
 
-const normalizeZodError = (err: ZodError): TNormalizedError => {
-  const details = err.issues.map((issue) => ({
+/** Stable codes let the frontend react without parsing human-readable text. */
+const zodIssueCode = (issue: ZodIssue): string => {
+  if (
+    issue.code === "invalid_type" &&
+    issue.message.toLowerCase().includes("received undefined")
+  ) {
+    return "REQUIRED";
+  }
+
+  switch (issue.code) {
+    case "invalid_type":
+      return "INVALID_TYPE";
+    case "too_small":
+      return "origin" in issue && issue.origin === "string" && issue.minimum === 1
+        ? "REQUIRED"
+        : "TOO_SMALL";
+    case "too_big":
+      return "origin" in issue && issue.origin === "string"
+        ? "TOO_LONG"
+        : "TOO_BIG";
+    case "invalid_format":
+      return "INVALID_FORMAT";
+    case "invalid_value":
+      return "values" in issue && Array.isArray(issue.values)
+        ? "INVALID_ENUM"
+        : "INVALID_VALUE";
+    case "unrecognized_keys":
+      return "UNKNOWN_FIELD";
+    case "custom":
+      return "INVALID_VALUE";
+    default:
+      return "VALIDATION_ERROR";
+  }
+};
+
+const normalizeZodError = (err: ZodError): TNormalizedError => ({
+  statusCode: 422,
+  errorCode: "VALIDATION_ERROR",
+  message: "Validation failed",
+  details: err.issues.map((issue) => ({
     field: toFieldName(issue.path),
     message: issue.message,
-  }));
-
-  const first = details[0];
-  return {
-    statusCode: 422,
-    errorCode: "VALIDATION_ERROR",
-    // Surface the specific reason at the top level so a frontend that shows
-    // `message` gets something meaningful, not a generic "Validation failed".
-    message: first ? `${first.field}: ${first.message}` : "Validation failed",
-    details,
-  };
-};
+    code: zodIssueCode(issue),
+  })),
+});
 
 const normalizePrismaKnownError = (
   err: Prisma.PrismaClientKnownRequestError
 ): TNormalizedError => {
   switch (err.code) {
     case "P2002": {
-      // Unique constraint violation → duplicate entry.
       const target = err.meta?.target;
-      const fields = Array.isArray(target) ? target.join(", ") : String(target ?? "");
+      const fields = Array.isArray(target)
+        ? target.map(String)
+        : typeof target === "string"
+          ? [target]
+          : [];
+
       return {
         statusCode: 409,
         errorCode: "DUPLICATE_ENTRY",
-        message: fields
-          ? `A record with this ${fields} already exists`
-          : "A record with these details already exists",
+        message:
+          fields.length > 0
+            ? `A record with this ${fields.join(", ")} already exists`
+            : "A record with these details already exists",
+        details:
+          fields.length > 0
+            ? fields.map((field) => ({
+                field,
+                message: `${field} must be unique`,
+                code: "DUPLICATE",
+              }))
+            : undefined,
       };
     }
     case "P2025":
@@ -95,17 +118,15 @@ const normalizePrismaKnownError = (
         message: "A required value is missing",
       };
     default:
-      // Connection/auth/unknown DB codes (e.g. P1000) are server-side.
       return {
         statusCode: 500,
-        errorCode: `DATABASE_ERROR`,
+        errorCode: "DATABASE_ERROR",
         message: "A database error occurred",
       };
   }
 };
 
 const normalizeError = (err: unknown): TNormalizedError => {
-  // 1) Our own, fully-described application errors.
   if (err instanceof AppError) {
     return {
       statusCode: err.statusCode,
@@ -115,12 +136,8 @@ const normalizeError = (err: unknown): TNormalizedError => {
     };
   }
 
-  // 2) Validation (Zod) → 422 with field-level details.
-  if (err instanceof ZodError) {
-    return normalizeZodError(err);
-  }
+  if (err instanceof ZodError) return normalizeZodError(err);
 
-  // 3) Prisma database errors.
   if (err instanceof Prisma.PrismaClientKnownRequestError) {
     return normalizePrismaKnownError(err);
   }
@@ -139,7 +156,6 @@ const normalizeError = (err: unknown): TNormalizedError => {
     };
   }
 
-  // 4) Authentication (JWT) errors.
   if (err instanceof TokenExpiredError) {
     return {
       statusCode: 401,
@@ -155,7 +171,6 @@ const normalizeError = (err: unknown): TNormalizedError => {
     };
   }
 
-  // 5) body-parser / http errors carry a numeric statusCode/status.
   if (typeof err === "object" && err !== null && ("statusCode" in err || "status" in err)) {
     const httpError = err as {
       statusCode?: number;
@@ -164,6 +179,7 @@ const normalizeError = (err: unknown): TNormalizedError => {
       type?: string;
     };
     const statusCode = httpError.statusCode ?? httpError.status ?? 500;
+
     if (httpError.type === "entity.too.large") {
       return {
         statusCode: 413,
@@ -171,14 +187,21 @@ const normalizeError = (err: unknown): TNormalizedError => {
         message: "Request payload is too large",
       };
     }
+    if (httpError.type === "entity.parse.failed") {
+      return {
+        statusCode: 400,
+        errorCode: "BAD_REQUEST",
+        message: "Malformed JSON request body",
+      };
+    }
+
     return {
       statusCode,
       errorCode: statusCode >= 500 ? "INTERNAL_SERVER_ERROR" : "BAD_REQUEST",
-      message: httpError.message ?? "Bad request",
+      message: statusCode >= 500 ? "Something went wrong. Please try again." : "Bad request",
     };
   }
 
-  // 6) Fallback — unknown/unhandled error.
   return {
     statusCode: 500,
     errorCode: "INTERNAL_SERVER_ERROR",
@@ -190,14 +213,17 @@ export const errorHandler = (
   err: unknown,
   req: Request,
   res: Response,
-  // Required so Express recognises this as a 4-arg error handler.
   _next: NextFunction
 ) => {
   const { statusCode, message, errorCode, details } = normalizeError(err);
+  const responseDetails = details?.map((detail) => ({
+    ...detail,
+    code: detail.code ?? errorCode,
+  }));
 
-  // Log server-side faults (5xx) with full context; 4xx are client mistakes.
+  // Retain the original technical object in server logs, never in JSON.
   if (statusCode >= 500) {
-    console.error(`[${req.method}] ${req.originalUrl} →`, err);
+    console.error(`[${req.method}] ${req.originalUrl} ->`, err);
   }
 
   const error: Record<string, unknown> = {
@@ -205,18 +231,16 @@ export const errorHandler = (
     statusCode,
   };
 
-  if (details && details.length > 0) {
-    error.details = details;
-  }
-
-  // Never leak stack traces in production; helpful in development.
-  if (!isProduction && err instanceof Error) {
-    error.stack = err.stack;
+  if (responseDetails && responseDetails.length > 0) {
+    error.details = responseDetails;
   }
 
   res.status(statusCode).json({
     success: false,
     message,
+    ...(responseDetails && responseDetails.length > 0
+      ? { errors: responseDetails }
+      : {}),
     error,
   });
 };

@@ -5,7 +5,9 @@ const HOST = process.env.HOST || "127.0.0.1";
 
 const startServer = async (): Promise<void> => {
   const server = app.listen(PORT, HOST, () => {
-    console.log(`Server running at http://${HOST}:${PORT}`);
+    console.log(
+      `Server ${process.env.APP_VERSION || "development"} running at http://${HOST}:${PORT}`
+    );
   });
 
   // Safety nets: never let an unhandled async error take the process down
